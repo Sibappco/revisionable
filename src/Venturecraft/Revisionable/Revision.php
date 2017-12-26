@@ -3,6 +3,7 @@
 namespace Venturecraft\Revisionable;
 
 use Illuminate\Database\Eloquent\Model as Eloquent;
+use Illuminate\Database\Eloquent\Relations\Relation;
 use Illuminate\Support\Facades\Log;
 
 /**
@@ -75,7 +76,10 @@ class Revision extends Eloquent
      */
     private function formatFieldName($key)
     {
-        $related_model = $this->revisionable_type;
+        $related_model = $this->getMorphClass($this->revisionable_type);
+
+
+
         $related_model = new $related_model;
         $revisionFormattedFieldNames = $related_model->getRevisionFormattedFieldNames();
 
@@ -127,7 +131,7 @@ class Revision extends Eloquent
         $which_value = $which . '_value';
 
         // First find the main model that was updated
-        $main_model = $this->revisionable_type;
+        $main_model = $this->getMorphClass($this->revisionable_type);
         // Load it, WITH the related model
         if (class_exists($main_model)) {
             $main_model = new $main_model;
@@ -160,16 +164,14 @@ class Revision extends Eloquent
                         return $this->format($this->key, $item->getRevisionUnknownString());
                     }
 
-                    // Check if model use RevisionableTrait
-                    if(method_exists($item, 'identifiableName')) {
-                        // see if there's an available mutator
-                        $mutator = 'get' . studly_case($this->key) . 'Attribute';
-                        if (method_exists($item, $mutator)) {
-                            return $this->format($item->$mutator($this->key), $item->identifiableName());
-                        }
 
-                        return $this->format($this->key, $item->identifiableName());
+                    // see if there's an available mutator
+                    $mutator = 'get' . studly_case($this->key) . 'Attribute';
+                    if (method_exists($item, $mutator)) {
+                        return $this->format($item->$mutator($this->key), $item->identifiableName());
                     }
+
+                    return $this->format($this->key, $item->identifiableName());
                 }
             } catch (\Exception $e) {
                 // Just a fail-safe, in the case the data setup isn't as expected
@@ -228,7 +230,9 @@ class Revision extends Eloquent
      */
     public function userResponsible()
     {
-        if (empty($this->user_id)) { return false; }
+        if (empty($this->user_id)) {
+            return false;
+        }
         if (class_exists($class = '\Cartalyst\Sentry\Facades\Laravel\Sentry')
             || class_exists($class = '\Cartalyst\Sentinel\Laravel\Facades\Sentinel')
         ) {
@@ -280,7 +284,7 @@ class Revision extends Eloquent
      */
     public function format($key, $value)
     {
-        $related_model = $this->revisionable_type;
+        $related_model = $this->getMorphClass($this->revisionable_type);
         $related_model = new $related_model;
         $revisionFormattedFields = $related_model->getRevisionFormattedFields();
 
@@ -289,5 +293,10 @@ class Revision extends Eloquent
         } else {
             return $value;
         }
+    }
+
+    private function getMorphClass($relatedModel)
+    {
+        return Relation::getMorphedModel($relatedModel) ?? $relatedModel;
     }
 }
