@@ -295,7 +295,7 @@ class Revision extends Eloquent
         }
     }
 
-    private function getMorphClass($relatedModel)
+    public function getMorphClass($relatedModel)
     {
         return Relation::getMorphedModel($relatedModel) ?? $relatedModel;
     }
